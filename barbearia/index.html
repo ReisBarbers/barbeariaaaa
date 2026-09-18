@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reis Barber | Agendamento</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <main class="shell">
+        <header><div class="brand"><img class="brand-art" src="ChatGPT%20Image%2018%20de%20set.%20de%202026,%2017_43_08.png" alt="Logotipo Reis Barber"><span>REIS BARBER</span></div><div style="display:flex;align-items:center;gap:18px"><button class="owner-button" type="button" id="owner-toggle">Área do barbeiro</button><div class="step">PASSO <strong>1</strong> DE 3</div></div></header>
+        <section class="intro"><p class="eyebrow">Agenda online</p><h1>Seu próximo corte começa aqui.</h1><p class="intro-copy">Escolha o serviço, encontre um horário que combina com você e deixe o resto com Alexandre.</p><div class="location"><span>⌖ <b>Rua Santa Isabel, 795</b> · Bom Jesus, Porto Alegre/RS</span><span>◷ Seg e Ter 10:00–20:00 · Qua a Sáb 09:00–20:00</span><a class="contact" href="https://wa.me/5551992088306" target="_blank" rel="noreferrer">WhatsApp (51) 99208-8306</a><a class="contact" href="https://instagram.com/reisbarberoficial" target="_blank" rel="noreferrer">Instagram @reisbarberoficial</a></div></section>
+        <div class="layout">
+            <section class="panel"><div class="panel-head"><h2>Escolha o serviço</h2><span class="step">9 opções</span></div><div id="service-list" class="service-list"></div></section>
+            <section class="panel calendar"><div class="calendar-top"><div><h2>Data e horário</h2><p id="selected-service">Selecione um serviço para começar</p></div><span class="eyebrow" style="margin:0">Setembro</span></div><div id="date-strip" class="date-strip"></div><div id="times" class="times"><div class="empty">Os horários aparecem depois que você escolher uma data.</div></div><div class="notice"><b>✦</b><span>Não encontrou o horário ideal? Fale com a barbearia e avise quando abrir outro encaixe.</span></div><p class="public-note">Os horários reservados aparecem bloqueados para todos os visitantes. Os dados dos clientes ficam visíveis somente para o barbeiro.</p><div id="summary" class="summary" hidden><div><small>Seu horário</small><strong id="summary-text"></strong></div><button type="button" id="confirm">Informar meus dados</button></div></section>
+        </div>
+        <section class="owner-panel" id="owner-panel" aria-live="polite">
+            <div class="owner-content" id="owner-content">
+                <div class="owner-head"><div><h2>Agenda do barbeiro</h2><div class="owner-note">Horários públicos da barbearia</div></div><div><button class="owner-close" type="button" id="owner-close" aria-label="Fechar agenda">×</button></div></div>
+                <div id="booking-list" class="booking-list"></div>
+            </div>
+        </section>
+        <section class="client-form" id="client-form">
+            <h2>Finalize seu agendamento</h2>
+            <p class="form-intro" id="form-summary"></p>
+            <form id="booking-form">
+                <div class="form-grid">
+                    <div class="form-field"><label for="client-name">Nome completo</label><input id="client-name" name="name" type="text" autocomplete="name" required></div>
+                    <div class="form-field"><label for="client-phone">Celular / WhatsApp</label><input id="client-phone" name="phone" type="tel" autocomplete="tel" required></div>
+                    <div class="form-field"><label for="client-email">E-mail</label><input id="client-email" name="email" type="email" autocomplete="email" required></div>
+                </div>
+                <div class="form-actions"><button class="form-cancel" type="button" id="form-cancel">Voltar</button><button class="form-submit" type="submit">Confirmar agendamento</button></div>
+            </form>
+        </section>
+    </main>
+    <script>
+        const services = [
+            {name:'Barba',duration:'15 min',price:'R$ 25,00'}, {name:'Coloração',detail:'Dependendo da cor, do tipo de cabelo e entre outros',duration:'45 min',price:'Sob consulta'}, {name:'Combo (corte, barba e sobrancelha)',duration:'60 min',price:'R$ 60,00'}, {name:'Corte',duration:'30 min',price:'R$ 35,00'}, {name:'Corte e sobrancelha',duration:'45 min',price:'R$ 40,00'}, {name:'Corte na tesoura',duration:'30 min',price:'R$ 40,00'}, {name:'Luzes',detail:'A partir de 120R$',duration:'120 min',price:'A partir de R$ 120,00'}, {name:'Nevou (platinado)',duration:'120 min',price:'A partir de R$ 140,00'}, {name:'Sobrancelha',duration:'10 min',price:'R$ 10,00'}
+        ];
+
+        function createCalendarDays() {
+            const start = new Date();
+            start.setHours(0, 0, 0, 0);
+            const calendarDays = [];
+
+            for (let index = 0; index < 14; index += 1) {
+                const date = new Date(start);
+                date.setDate(start.getDate() + index);
+
+                const weekday = new Intl.DateTimeFormat('pt-BR', { weekday: 'short' }).format(date).replace('.', '').toLowerCase();
+                const dayNumber = String(date.getDate()).padStart(2, '0');
+                const month = new Intl.DateTimeFormat('pt-BR', { month: 'short' }).format(date).replace('.', '').toLowerCase();
+                const isOpen = date.getDay() !== 0;
+
+                calendarDays.push([weekday, dayNumber, month, isOpen, date]);
+            }
+
+            return calendarDays;
+        }
+
+        const days = createCalendarDays();
+        const currentMonthLabel = new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date());
+        const monthTitle = document.querySelector('.calendar-top .eyebrow');
+        if (monthTitle) {
+            monthTitle.textContent = currentMonthLabel.charAt(0).toUpperCase() + currentMonthLabel.slice(1);
+        }
+
+        function clearLegacyLocalBookings() {
+            try {
+                const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
+                if (Array.isArray(saved) && saved.length > 0) {
+                    localStorage.removeItem(storageKey);
+                }
+            } catch (error) {
+                localStorage.removeItem(storageKey);
+            }
+        }
+
+        function generateTimeSlots(dateValue) {
+            const dayOfWeek = dateValue.getDay();
+            const startHour = dayOfWeek === 1 || dayOfWeek === 2 ? 10 : 9;
+            const slots = [];
+
+            for (let hour = startHour; hour < 20; hour += 1) {
+                for (const minute of [0, 30]) {
+                    const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+                    if (hour === 19 && minute === 30) continue;
+                    slots.push(time);
+                }
+            }
+
+            return slots;
+        }
+
+        function normalizeDateKey(value) {
+            if (!value) return '';
+            const text = String(value).trim().toLowerCase().replace(/\s+/g, ' ');
+            const monthMap = {
+                jan: '01', fev: '02', mar: '03', abr: '04', mai: '05', jun: '06',
+                jul: '07', ago: '08', set: '09', out: '10', nov: '11', dez: '12'
+            };
+
+            const directMatch = text.match(/^(\d{1,2})\s+(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)$/i);
+            if (directMatch) {
+                const day = String(parseInt(directMatch[1], 10)).padStart(2, '0');
+                const month = monthMap[directMatch[2].slice(0, 3).toLowerCase()];
+                return `${new Date().getFullYear()}-${month}-${day}`;
+            }
+
+            const iso = new Date(text);
+            if (!Number.isNaN(iso.getTime())) {
+                return iso.toISOString().slice(0, 10);
+            }
+
+            return text;
+        }
+
+        let selectedService = null, selectedDate = null, selectedTime = null;
+        const storageKey = 'reis-barber-agendamentos';
+        const apiBase = '/api';
+        let apiToken = sessionStorage.getItem('reis-barber-token') || '';
+        const serviceList = document.querySelector('#service-list'), dateStrip = document.querySelector('#date-strip'), times = document.querySelector('#times'), summary = document.querySelector('#summary');
+
+        async function refreshPublicState() {
+            try {
+                const result = await apiRequest('/appointments');
+                if (Array.isArray(result.appointments) && result.appointments.length === 0) {
+                    clearLegacyLocalBookings();
+                }
+            } catch (error) {
+                // fallback local only if the backend is unavailable
+            }
+        }
+        services.forEach(service => { const button=document.createElement('button'); button.className='service'; button.type='button'; button.innerHTML=`<span><span class="service-name">${service.name}</span>${service.detail ? `<span class="service-detail">${service.detail}</span>` : ''}</span><span class="service-meta"><span>${service.duration}</span><span class="price">${service.price}</span></span>`; button.addEventListener('click',()=>{document.querySelectorAll('.service').forEach(item=>item.classList.remove('selected'));button.classList.add('selected');selectedService=service;document.querySelector('#selected-service').textContent=`${service.name} · ${service.duration} · ${service.price}`;if(selectedDate) renderTimes();});serviceList.appendChild(button); });
+        days.forEach((day,index)=>{const button=document.createElement('button');button.className='date';button.type='button';button.disabled=!day[3];button.innerHTML=`<small>${day[0]}</small><strong>${day[1]}</strong><small>${day[2]}</small>`;button.addEventListener('click',()=>{document.querySelectorAll('.date').forEach(item=>item.classList.remove('active'));button.classList.add('active');selectedDate=day;selectedTime=null;renderTimes();});dateStrip.appendChild(button);if(index===0)button.click();});
+        async function getPublicBookings(){
+            try {
+                const response = await apiRequest('/appointments');
+                return Array.isArray(response.appointments) ? response.appointments : [];
+            } catch (error) {
+                const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
+                return Array.isArray(saved) ? saved : [];
+            }
+        }
+
+        async function renderTimes(){
+            if (!selectedDate) return;
+
+            const available = generateTimeSlots(selectedDate[4]);
+            const bookings = await getPublicBookings();
+            const dateKey = normalizeDateKey(`${selectedDate[1]} ${selectedDate[2]}`);
+            const groups = [['Manhã', available.filter(time => time < '12:00')], ['Tarde', available.filter(time => time >= '12:00' && time < '18:00')], ['Noite', available.filter(time => time >= '18:00')]];
+
+            times.innerHTML = groups.filter(group => group[1].length).map(([label, slots]) => `
+                <div class="period">
+                    <div class="period-title">${label}</div>
+                    <div class="time-grid">${slots.map(time => {
+                        const reserved = bookings.some(item => normalizeDateKey(item.date) === dateKey && item.time === time);
+                        return `<button class="time" type="button" data-time="${time}" ${reserved ? 'disabled aria-label="Horário reservado"' : ''}>${reserved ? 'Reservado' : time}</button>`;
+                    }).join('')}</div>
+                </div>
+            `).join('');
+
+            times.querySelectorAll('.time:not(:disabled)').forEach(button => button.addEventListener('click', () => {
+                times.querySelectorAll('.time').forEach(item => item.classList.remove('active'));
+                button.classList.add('active');
+                selectedTime = button.dataset.time;
+                updateSummary();
+            }));
+        }
+        function updateSummary(){if(!selectedService||!selectedDate||!selectedTime)return;summary.hidden=false;document.querySelector('#summary-text').textContent=`${selectedDate[1]} ${selectedDate[2]} · ${selectedTime} · ${selectedService.name}`;}
+        async function apiRequest(path,options={}){const headers={'Content-Type':'application/json',...(options.headers||{})};if(apiToken)headers.Authorization=`Bearer ${apiToken}`;const response=await fetch(`${apiBase}${path}`,{...options,headers});const data=await response.json();if(!response.ok)throw new Error(data.error||'Erro na API');return data;}
+        const ownerPanel = document.querySelector('#owner-panel');
+        const ownerLogin = document.querySelector('#owner-login');
+        const ownerContent = document.querySelector('#owner-content');
+        let ownerAuthenticated = false;
+        const clientForm = document.querySelector('#client-form');
+        document.querySelector('#confirm').addEventListener('click',()=>{if(!selectedService||!selectedDate||!selectedTime)return;document.querySelector('#form-summary').textContent=`${selectedService.name} · ${selectedDate[1]} ${selectedDate[2]} às ${selectedTime} · ${selectedService.price}`;clientForm.classList.add('open');clientForm.scrollIntoView({behavior:'smooth',block:'start'});});
+        document.querySelector('#form-cancel').addEventListener('click',()=>clientForm.classList.remove('open'));
+        document.querySelector('#booking-form').addEventListener('submit',async event=>{event.preventDefault();const formData=new FormData(event.currentTarget),booking={date:`${selectedDate[1]} ${selectedDate[2]}`,day:selectedDate[0],time:selectedTime,service:selectedService.name,price:selectedService.price,name:formData.get('name').trim(),phone:formData.get('phone').trim(),email:formData.get('email').trim()};try{await apiRequest('/appointments',{method:'POST',body:JSON.stringify(booking)});}catch(error){const bookings=JSON.parse(localStorage.getItem(storageKey)||'[]');if(bookings.some(item=>normalizeDateKey(item.date)===normalizeDateKey(booking.date)&&item.time===booking.time)){alert('Esse horário já foi reservado. Escolha outro horário.');clientForm.classList.remove('open');renderTimes();return;}bookings.push({...booking,id:Date.now()});localStorage.setItem(storageKey,JSON.stringify(bookings));}event.currentTarget.reset();clientForm.classList.remove('open');selectedTime=null;renderTimes();updateSummary();renderBookings();alert('Agendamento confirmado! O barbeiro já pode visualizá-lo na Área do barbeiro.');});
+
+        refreshPublicState();
+        document.querySelector('#owner-toggle').addEventListener('click',async()=>{ownerPanel.classList.toggle('open');if(ownerPanel.classList.contains('open'))ownerPanel.scrollIntoView({behavior:'smooth',block:'start'});await renderBookings();});
+        document.querySelector('#owner-close').addEventListener('click',()=>ownerPanel.classList.remove('open'));
+        async function renderBookings(){
+            const list=document.querySelector('#booking-list');
+            let bookings=[];
+            try {
+                const response=await apiRequest('/barber/appointments');
+                bookings = Array.isArray(response.appointments) ? response.appointments : [];
+            } catch (error) {
+                const saved=JSON.parse(localStorage.getItem(storageKey)||'[]');
+                bookings = Array.isArray(saved) ? saved : [];
+            }
+
+            bookings.sort((a,b)=>String(a.createdAt||a.id).localeCompare(String(b.createdAt||b.id)));
+            if(!bookings.length){
+                list.innerHTML='<div class="booking-empty">Nenhum agendamento confirmado ainda.</div>';
+                return;
+            }
+
+            list.innerHTML=bookings.map(item=>`<article class="booking"><div class="booking-time">${item.day || 'Agendamento'}, ${item.date}<br>${item.time}</div><div class="booking-client"><strong>${item.name}</strong><small>${item.service} · ${item.phone} · ${item.email}${item.price ? ` · ${item.price}` : ''}</small></div><button class="booking-remove" type="button" data-id="${item.id}">Cancelar</button></article>`).join('');
+            list.querySelectorAll('.booking-remove').forEach(button=>button.addEventListener('click',async()=>{try{await apiRequest(`/barber/appointments/${button.dataset.id}`,{method:'DELETE'});}catch(error){const remaining=bookings.filter(item=>String(item.id)!==button.dataset.id);localStorage.setItem(storageKey,JSON.stringify(remaining));}renderBookings();renderTimes();}));
+        }
+    </script>
+</body>
+</html>
